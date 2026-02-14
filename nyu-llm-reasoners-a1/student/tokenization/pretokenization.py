@@ -91,6 +91,11 @@ def _process_chunk(args: tuple[str | os.PathLike, int, int, str, str]) -> dict[t
     return dict(counts)
 
 
+# When running single-process (max_workers<=1), use this many chunks so we don't
+# load the whole file into memory at once (each chunk processed then discarded).
+_SEQUENTIAL_CHUNKS = 32
+
+
 def get_pretoken_counts(
     corpus_path: str | os.PathLike,
     special_tokens: list[str],
@@ -102,15 +107,16 @@ def get_pretoken_counts(
     Outputs: dict mapping pre-token (tuple of bytes) -> count, for use in BPE merging.
     """
     split_pattern = "|".join(re.escape(t) for t in special_tokens)
+    num_chunks = _SEQUENTIAL_CHUNKS if max_workers <= 1 else max_workers
     with open(corpus_path, "rb") as f:
-        boundaries = find_chunk_boundaries(f, max_workers, special_tokens[0].encode("utf-8"))
+        boundaries = find_chunk_boundaries(f, num_chunks, special_tokens[0].encode("utf-8"))
     chunk_args = [
         (corpus_path, start, end, split_pattern, PRETOKENIZATION_PATTERN)
         for start, end in zip(boundaries[:-1], boundaries[1:])
     ]
     all_counts: Counter[tuple[bytes, ...]] = Counter()
     if max_workers <= 1:
-        # Single process: avoid ProcessPool to prevent OOM/BrokenProcessPool on HPC
+        # Single process: avoid ProcessPool; process one chunk at a time to limit memory
         for args in chunk_args:
             all_counts.update(_process_chunk(args))
     else:
