@@ -51,15 +51,16 @@ def train_bpe(
     corpus_path: str | os.PathLike,
     vocab_size: int,
     special_tokens: list[str],
+    max_workers: int = 4,
 ):
     """
     Train BPE using pre-tokenized counts from pretokenization.
-    Inputs: corpus_path, vocab_size (total tokens including special + bytes + merges), special_tokens.
+    Inputs: corpus_path, vocab_size (total tokens including special + bytes + merges), special_tokens, max_workers (parallel workers for pretokenization; use 1 on HPC to avoid OOM).
     Outputs: vocabulary (id -> bytes), merges (list of (left, right) pairs in order applied).
     """
     # Get pre-token counts (split on special tokens, regex pre-tokenizer, parallel chunks)
     pretoken_counts: dict[tuple[bytes, ...], int] = get_pretoken_counts(
-        corpus_path, special_tokens
+        corpus_path, special_tokens, max_workers=max_workers
     )
 
     # Initial vocab: special tokens first, then all 256 bytes (order 0..255)

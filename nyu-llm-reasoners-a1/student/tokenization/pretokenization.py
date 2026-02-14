@@ -94,25 +94,30 @@ def _process_chunk(args: tuple[str | os.PathLike, int, int, str, str]) -> dict[t
 def get_pretoken_counts(
     corpus_path: str | os.PathLike,
     special_tokens: list[str],
+    max_workers: int = 4,
 ) -> dict[tuple[bytes, ...], int]:
     """
     Returns pre-token counts for the corpus, split on special tokens, parallel over chunks.
-    Inputs: corpus_path, special_tokens (list to split on).
+    Inputs: corpus_path, special_tokens (list to split on), max_workers (parallel processes; use 1 for low-memory/HPC).
     Outputs: dict mapping pre-token (tuple of bytes) -> count, for use in BPE merging.
     """
-    num_processes = 4  # Fixed number of parallel workers
     split_pattern = "|".join(re.escape(t) for t in special_tokens)
     with open(corpus_path, "rb") as f:
-        boundaries = find_chunk_boundaries(f, num_processes, special_tokens[0].encode("utf-8"))
+        boundaries = find_chunk_boundaries(f, max_workers, special_tokens[0].encode("utf-8"))
     chunk_args = [
         (corpus_path, start, end, split_pattern, PRETOKENIZATION_PATTERN)
         for start, end in zip(boundaries[:-1], boundaries[1:])
     ]
     all_counts: Counter[tuple[bytes, ...]] = Counter()
-    with ProcessPoolExecutor(max_workers=num_processes) as executor:
-        futures = [executor.submit(_process_chunk, args) for args in chunk_args]
-        for future in as_completed(futures):
-            all_counts.update(future.result())
+    if max_workers <= 1:
+        # Single process: avoid ProcessPool to prevent OOM/BrokenProcessPool on HPC
+        for args in chunk_args:
+            all_counts.update(_process_chunk(args))
+    else:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(_process_chunk, args) for args in chunk_args]
+            for future in as_completed(futures):
+                all_counts.update(future.result())
     return dict(all_counts)
 
 

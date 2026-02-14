@@ -43,6 +43,7 @@ def main() -> None:
         corpus_path=train_path,
         vocab_size=VOCAB_SIZE,
         special_tokens=[SPECIAL_TOKEN],
+        max_workers=1,  # Avoid BrokenProcessPool/OOM on HPC; use 4 for faster local runs
     )
     tokenizer = Tokenizer(vocab=vocab, merges=merges, special_tokens=[SPECIAL_TOKEN])
     print("Done.\n")
