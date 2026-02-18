@@ -78,12 +78,15 @@ def train_bpe(
     if num_merges_needed <= 0:
         return vocabulary, merges
 
-    # Repeatedly merge the most frequent adjacent pair and update counts
+    # Repeatedly merge the most frequent adjacent pair and update counts.
+    # Tie-break: prefer the lexicographically greater pair (assignment §2.4).
     for _ in range(num_merges_needed):
         pair_counts = _get_pair_counts(pretoken_counts)
         if not pair_counts:
             break
-        (p, q), _ = pair_counts.most_common(1)[0]
+        max_count = pair_counts.most_common(1)[0][1]
+        tied_pairs = [pair for pair, cnt in pair_counts.items() if cnt == max_count]
+        (p, q) = max(tied_pairs)
         new_token = p + q
         vocabulary[next_id] = new_token
         next_id += 1

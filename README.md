@@ -64,7 +64,7 @@ For cluster-specific details (partition names, time limits, modules), see **HPC_
 
 1. **On the login node**: clone the repo, download data, install deps, then tokenize (once):
    ```sh
-   cd /path/to/nyu-llm-reasoners-a1
+   cd /path/to/A1
    uv sync
    # download TinyStories into data/ (see above)
    uv run python -m student.tinystories_tokenize_analysis

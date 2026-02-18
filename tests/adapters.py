@@ -205,7 +205,30 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    from student.model.components.attention import MultiheadSelfAttention
+    from student.model.components.rope import RotaryPositionalEmbedding
+
+    d_k = d_model // num_heads
+    rope = RotaryPositionalEmbedding(theta=theta, d_k=d_k, max_seq_len=max_seq_len)
+    module = MultiheadSelfAttention(d_model=d_model, num_heads=num_heads)
+    module.load_state_dict(
+        {
+            "q_proj.weight": q_proj_weight,
+            "k_proj.weight": k_proj_weight,
+            "v_proj.weight": v_proj_weight,
+            "output_proj.weight": o_proj_weight,
+        }
+    )
+    if token_positions is None:
+        seq_len = in_features.size(-2)
+        token_positions = torch.arange(
+            seq_len, device=in_features.device, dtype=torch.long
+        )
+        view_shape = [1] * (in_features.dim() - 2) + [seq_len]
+        token_positions = token_positions.view(*view_shape).expand(
+            *in_features.shape[:-1]
+        )
+    return module(in_features, token_positions=token_positions, rope=rope)
 
 
 def run_rope(
@@ -454,7 +477,9 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
         Float[Tensor,"..."]: of with the same shape as `in_features` with the output of applying
         SiLU to each element.
     """
-    raise NotImplementedError
+    from student.model.components.ffn import silu
+
+    return silu(in_features)
 
 
 def run_get_batch(

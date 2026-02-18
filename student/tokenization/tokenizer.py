@@ -155,12 +155,13 @@ class Tokenizer:
                 last_was_special = True
             else:
                 part_bytes = part.encode("utf-8")
-                # After special token: do not merge first pair only when it is \n\n
-                # with more content after (tiktoken: "\n\n" alone -> 628; "\n\nx" -> 198,198).
+                # After special token: do not merge the first pair only when
+                # segment starts with "\n\n" and has more content (tiktoken:
+                # "\n\n" alone -> one token 628; "\n\nx" -> two newline tokens 198,198).
                 no_merge_first_pair = (
                     last_was_special
+                    and part_bytes.startswith(b"\n\n")
                     and len(part_bytes) > 2
-                    and part_bytes[0:2] == b"\n\n"
                 )
                 allow_merge = not no_merge_first_pair
                 ids.extend(
