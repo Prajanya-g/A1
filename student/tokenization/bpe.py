@@ -116,6 +116,11 @@ def train_bpe(
         # ── Incrementally update pair_counts and pair_to_pretokens ──────────────
         # Only pretokens that contain (p, q) are affected.
         affected_keys = pair_to_pretokens.pop((p, q), set())
+        # CRITICAL: remove (p, q) from pair_counts now. The loop below skips
+        # decrementing it (via `continue`) but never explicitly deletes it,
+        # so without this line the stale count persists and (p, q) wins every
+        # subsequent iteration — producing 9743 identical merges.
+        pair_counts.pop((p, q), None)
 
         # Collect (old_key, new_key, count) triples first so we can batch updates
         replacements: list[tuple[tuple[bytes, ...], tuple[bytes, ...], int]] = []
