@@ -21,6 +21,10 @@ class TransformerLM(nn.Module):
         num_heads: int,
         d_ff: int,
         rope_theta: float,
+        use_rmsnorm: bool = True,
+        pre_norm: bool = True,
+        use_rope: bool = True,
+        use_swiglu: bool = True,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
@@ -44,13 +48,21 @@ class TransformerLM(nn.Module):
                     d_ff=d_ff,
                     max_seq_len=context_length,
                     theta=rope_theta,
+                    use_rmsnorm=use_rmsnorm,
+                    pre_norm=pre_norm,
+                    use_rope=use_rope,
+                    use_swiglu=use_swiglu,
                     device=device,
                     dtype=dtype,
                 )
                 for _ in range(num_layers)
             ]
         )
-        self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
+        self.ln_final = (
+            RMSNorm(d_model, device=device, dtype=dtype)
+            if use_rmsnorm
+            else nn.Identity()
+        )
         self.lm_head = Linear(
             d_model, vocab_size, device=device, dtype=dtype
         )
