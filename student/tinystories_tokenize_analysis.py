@@ -4,10 +4,14 @@ TinyStories tokenizer analysis: compression ratio, throughput, dataset encoding.
 Run after training a 10K BPE tokenizer on TinyStories. Encodes train/valid to
 uint16 .npy and prints deliverable answers for (a) compression ratio,
 (b) throughput / Pile estimate, (c) uint16 rationale.
+
+Use --subset to train BPE on the valid set only and write tiny_train.npy /
+tiny_valid.npy (faster, for debugging or low-resource runs).
 """
-from pathlib import Path
+import argparse
 import random
 import time
+from pathlib import Path
 
 import numpy as np
 
@@ -30,17 +34,35 @@ def _load_documents(path: Path, special: str = SPECIAL_TOKEN) -> list[str]:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Train BPE on TinyStories and encode to .npy")
+    parser.add_argument(
+        "--subset",
+        action="store_true",
+        help="Train BPE on valid set only; write tiny_train.npy and tiny_valid.npy",
+    )
+    args = parser.parse_args()
+
     repo = Path(__file__).resolve().parent.parent  # student/ -> repo root
     data_dir = repo / "data"
     train_path = data_dir / "TinyStoriesV2-GPT4-train.txt"
     valid_path = data_dir / "TinyStoriesV2-GPT4-valid.txt"
 
-    if not train_path.exists():
-        raise FileNotFoundError(f"Training data not found: {train_path}")
+    if args.subset:
+        bpe_corpus = valid_path
+        out_train = data_dir / "tiny_train.npy"
+        out_valid = data_dir / "tiny_valid.npy"
+        if not valid_path.exists():
+            raise FileNotFoundError(f"Subset mode requires {valid_path}")
+    else:
+        bpe_corpus = train_path
+        out_train = data_dir / "train_tokens.npy"
+        out_valid = data_dir / "valid_tokens.npy"
+        if not train_path.exists():
+            raise FileNotFoundError(f"Training data not found: {train_path}")
 
-    print("Training 10K BPE tokenizer on TinyStories train...")
+    print(f"Training 10K BPE tokenizer on {'valid (subset)' if args.subset else 'train'}...")
     vocab, merges = train_bpe(
-        corpus_path=train_path,
+        corpus_path=bpe_corpus,
         vocab_size=VOCAB_SIZE,
         special_tokens=[SPECIAL_TOKEN],
         max_workers=4,  # Faster on 16GB+ RAM; use 1 if OOM on HPC/smaller machines
@@ -69,7 +91,7 @@ def main() -> None:
 
     # --- (b) Throughput and Pile estimate ---
     # Use a small chunk so timing completes in seconds (Python BPE is slow on large text).
-    raw = train_path.read_bytes()
+    raw = bpe_corpus.read_bytes()
     if len(raw) > THROUGHPUT_CHUNK_BYTES:
         chunk = raw[:THROUGHPUT_CHUNK_BYTES].decode("utf-8", errors="replace")
     else:
@@ -100,8 +122,6 @@ def main() -> None:
     print()
 
     # --- (c) Encode train and valid to uint16 .npy ---
-    out_train = data_dir / "train_tokens.npy"
-    out_valid = data_dir / "valid_tokens.npy"
     data_dir.mkdir(parents=True, exist_ok=True)
 
     for path, out_path in [(train_path, out_train), (valid_path, out_valid)]:
