@@ -32,8 +32,8 @@ LOGS="logs"
 mkdir -p "$LOGS"
 
 # ── Assumed best LR (change if sweep says otherwise, then rerun ablations) ────
-BEST_LR=3e-4
-LOWER_LR=6e-5   # 1/5 of best, for no_rmsnorm stability test
+BEST_LR=1e-3
+LOWER_LR=2e-4    # 1/5 of best, for no_rmsnorm stability test
 
 # ── Fixed hyperparameters ─────────────────────────────────────────────────────
 COMMON="
